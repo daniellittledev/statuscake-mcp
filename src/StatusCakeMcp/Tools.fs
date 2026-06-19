@@ -45,34 +45,41 @@ module private ToolHelpers =
 [<McpServerToolType>]
 type StatusCakeTools(client: StatusCakeClient) =
 
-    [<McpServerTool; Description("List uptime checks with their current status. Optionally filter \
-        by a case-insensitive substring of the name or URL, and/or by status ('up' or 'down'). \
-        Results are paged: returns one page (default 50) with a footer pointing to the next page \
-        when there are more. Use this on large accounts instead of fetching everything.")>]
+    [<McpServerTool; Description("List uptime checks with their current state. Optionally filter by \
+        a case-insensitive substring of the name or URL, and/or by state. State is one of: 'up' \
+        (running, last check passed), 'down' (running, last check FAILED), or 'paused' (suspended — \
+        a paused check is never 'up' or 'down' even if it last reported down). Results are paged \
+        (default 50) with a footer pointing to the next page. Use this on large accounts instead of \
+        fetching everything.")>]
     member _.ListSites
         (
             [<Description("Case-insensitive substring of the site name or URL. Blank = all sites.")>] [<Optional; DefaultParameterValue("")>] filter: string,
-            [<Description("Filter by status: 'up' or 'down'. Blank = any status.")>] [<Optional; DefaultParameterValue("")>] status: string,
+            [<Description("Filter by state: 'up', 'down', or 'paused'. Blank = any state.")>] [<Optional; DefaultParameterValue("")>] status: string,
             [<Description("1-based page number.")>] [<Optional; DefaultParameterValue(1)>] page: int,
             [<Description("Page size, max 100.")>] [<Optional; DefaultParameterValue(50)>] limit: int
         ) : Task<string> =
         ToolHelpers.guard "uptime" (fun () ->
             task {
-                if String.IsNullOrWhiteSpace filter then
-                    // No name filter: page server-side (status is a server filter too), one request.
-                    let! items, total = client.GetChecksPage(status, page, limit)
+                let state = if isNull status then "" else status.Trim().ToLowerInvariant()
+
+                if String.IsNullOrWhiteSpace filter && state = "" then
+                    // No filter at all: page server-side, one request.
+                    let! items, total = client.GetChecksPage("", page, limit)
                     return ToolHelpers.renderPage "sites" Format.formatSiteLine page limit total items
                 else
-                    // Name filter has no server-side equivalent: fetch all (status-filtered server-side),
-                    // then match and page client-side.
-                    let! all = client.ListChecks(status)
-                    let matched = all |> Format.filterByName filter
+                    // 'up'/'down' narrow server-side; 'paused' has no server filter (fetch all).
+                    // The state filter is then applied client-side so paused is excluded from up/down.
+                    let serverStatus = if state = "up" || state = "down" then state else ""
+                    let! all = client.ListChecks(serverStatus)
+                    let matched = all |> Format.filterByState state |> Format.filterByName filter
                     return ToolHelpers.renderList "sites" Format.formatSiteLine page limit matched
             })
 
-    [<McpServerTool; Description("Return only the uptime checks that are currently DOWN, with a count \
-        of how many of the total are down. Use this to quickly see if anything is broken. Optionally \
-        filter by a case-insensitive substring of the name or URL.")>]
+    [<McpServerTool; Description("Return uptime checks that are ACTIVELY down (running AND last check \
+        failed), with how many of the total that is. Use this to see if anything is actually broken. \
+        Paused checks are NOT counted as down even if they last reported down — they are suspended and \
+        not alerting; their count is noted separately (use list_sites status=paused to see them). \
+        Optionally filter by a case-insensitive substring of the name or URL.")>]
     member _.CheckSitesDown
         (
             [<Description("Case-insensitive substring of the site name or URL. Blank = all down sites.")>] [<Optional; DefaultParameterValue("")>] filter: string,
@@ -81,23 +88,36 @@ type StatusCakeTools(client: StatusCakeClient) =
         ) : Task<string> =
         ToolHelpers.guard "uptime" (fun () ->
             task {
-                let! down = client.ListDownChecks()
+                let! downStatus = client.ListDownChecks()
                 // Total comes from list metadata (one request), not a full account page-through.
                 let! total = client.CountAllChecks()
-                let matched = down |> Format.filterByName filter
+                let matched = downStatus |> Format.filterByName filter
+                let active = matched |> List.filter (fun c -> not c.Paused)
+                let pausedDown = List.length matched - List.length active
 
-                if List.isEmpty matched then
-                    return
-                        (if String.IsNullOrWhiteSpace filter then sprintf "All %d sites are up." total
-                         else "No matching sites are down.")
+                let note =
+                    if pausedDown > 0 then
+                        sprintf
+                            "\n(%d paused check%s last reported down — use list_sites status=paused to see them.)"
+                            pausedDown
+                            (if pausedDown = 1 then "" else "s")
+                    else
+                        ""
+
+                if List.isEmpty active then
+                    let head =
+                        if String.IsNullOrWhiteSpace filter then sprintf "0 of %d sites actively down." total
+                        else "No matching sites are actively down."
+                    return head + note
                 else
-                    let window, footer = Format.paginate page limit matched
+                    let window, footer = Format.paginate page limit active
                     let lines = window |> List.map Format.formatDownLine |> String.concat "\n"
-                    let body = sprintf "%d of %d sites down:\n%s" (List.length matched) total lines
-                    return
+                    let body = sprintf "%d of %d sites actively down:\n%s" (List.length active) total lines
+                    let withFooter =
                         match footer with
                         | Some f -> sprintf "%s\n%s" body f
                         | None -> body
+                    return withFooter + note
             })
 
     [<McpServerTool; Description("Get detail for a single uptime check by its ID: status, uptime %, \
