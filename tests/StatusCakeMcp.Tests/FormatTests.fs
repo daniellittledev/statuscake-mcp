@@ -28,6 +28,29 @@ let ``filterByName with a blank term returns everything`` () =
     Assert.Equal(2, (checks |> Format.filterByName "  ").Length)
 
 [<Fact>]
+let ``matchesState treats a paused check as paused, never up or down`` () =
+    let pausedLastDown = check "P" "p" "down" true
+    Assert.True(Format.matchesState "paused" pausedLastDown)
+    Assert.False(Format.matchesState "down" pausedLastDown)   // the bug: was counted as down
+    Assert.False(Format.matchesState "up" pausedLastDown)
+
+[<Fact>]
+let ``matchesState down means running and failing; up means running and passing`` () =
+    let activelyDown = check "D" "d" "down" false
+    let healthy = check "U" "u" "up" false
+    Assert.True(Format.matchesState "down" activelyDown)
+    Assert.False(Format.matchesState "up" activelyDown)
+    Assert.True(Format.matchesState "up" healthy)
+    Assert.False(Format.matchesState "paused" healthy)
+
+[<Fact>]
+let ``matchesState with a blank state matches everything`` () =
+    let checks = [ check "a" "a" "up" false; check "b" "b" "down" true; check "c" "c" "down" false ]
+    Assert.Equal(3, (checks |> Format.filterByState "").Length)
+    Assert.Equal(1, (checks |> Format.filterByState "paused").Length)
+    Assert.Equal(1, (checks |> Format.filterByState "down").Length)
+
+[<Fact>]
 let ``humanizeDuration shows largest two units`` () =
     Assert.Equal("2h 9m", Format.humanizeDuration 7743000L)   // 2h 9m 3s
     Assert.Equal("154d 18h", Format.humanizeDuration 13373262000L)

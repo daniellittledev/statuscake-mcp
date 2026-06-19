@@ -16,6 +16,20 @@ let filterByName (term: string) (checks: UptimeCheck list) : UptimeCheck list =
             c.Name.Contains(t, StringComparison.OrdinalIgnoreCase)
             || c.WebsiteUrl.Contains(t, StringComparison.OrdinalIgnoreCase))
 
+/// Does a check match a requested state? Every check is exactly one of three states:
+/// "up" (running, last passed), "down" (running, last failed), "paused" (suspended —
+/// regardless of last status). A blank/unknown state matches everything.
+let matchesState (state: string) (c: UptimeCheck) : bool =
+    match (if isNull state then "" else state.Trim().ToLowerInvariant()) with
+    | "paused" -> c.Paused
+    | "down" -> not c.Paused && c.Status = "down"
+    | "up" -> not c.Paused && c.Status = "up"
+    | _ -> true
+
+/// Keep only checks matching the requested state (blank = all).
+let filterByState (state: string) (checks: UptimeCheck list) : UptimeCheck list =
+    checks |> List.filter (matchesState state)
+
 /// Compact human duration from milliseconds, largest two non-zero units (d/h/m),
 /// e.g. "2h 9m", "154d 18h", or "<1m" for anything under a minute.
 let humanizeDuration (ms: int64) : string =
