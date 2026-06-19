@@ -1,8 +1,9 @@
 # statuscake-mcp
 
 A minimal, token-efficient [Model Context Protocol](https://modelcontextprotocol.io)
-server for [StatusCake](https://www.statuscake.com), written in F# on .NET and
-served over Streamable HTTP.
+server for [StatusCake](https://www.statuscake.com), written in F# on .NET. It speaks
+**stdio by default** (the client launches it on demand) and can also run as a
+**Streamable HTTP** server for remote or shared use.
 
 It exposes a small set of tools that return terse plain-text summaries (not raw JSON)
 so an LLM client spends as few tokens as possible. List tools are **filtered and paged**
@@ -27,16 +28,27 @@ Read tools resolve a check by the `id` shown in `list_sites` / `check_sites_down
 
 ## Install
 
-Once published, install it as a .NET global tool and run the `statuscake-mcp` command:
+Install it as a .NET global tool:
 
 ```bash
 dotnet tool install -g StatusCakeMcp
-STATUSCAKE__APITOKEN="your-token" ASPNETCORE_URLS="http://localhost:5250" statuscake-mcp
 ```
 
-The installed tool does not read `launchSettings.json`, so without `ASPNETCORE_URLS`
-it binds to the ASP.NET Core default (`http://localhost:5000`). Set `ASPNETCORE_URLS`
-to pin the port your MCP client expects.
+The `statuscake-mcp` command runs over **stdio** by default, so an MCP client launches
+it on demand — point the client at the command and pass the token via its environment:
+
+```json
+{
+  "mcpServers": {
+    "statuscake": {
+      "command": "statuscake-mcp",
+      "env": { "STATUSCAKE__APITOKEN": "your-statuscake-api-token" }
+    }
+  }
+}
+```
+
+See [Transports](#transports) below to run it as an HTTP server instead.
 
 ## Configuration
 
@@ -56,21 +68,30 @@ dotnet user-secrets set "StatusCake:ApiToken" "your-statuscake-api-token" --proj
 
 Never commit the token. `.env` is already git-ignored.
 
-## Build & run
+## Transports
+
+The server selects its transport at startup:
+
+| Transport | When | How to select |
+| --- | --- | --- |
+| **stdio** | local use; the MCP client launches the process | default |
+| **Streamable HTTP** | remote, shared, or web-based clients | `--http` flag, or `STATUSCAKE__TRANSPORT=http` |
+
+### stdio (default)
+
+Nothing to start manually — the client spawns `statuscake-mcp` and talks to it over
+stdin/stdout. Logs go to stderr so they never corrupt the protocol stream. Use the
+client config shown under [Install](#install).
+
+### HTTP
 
 ```bash
-dotnet build
-STATUSCAKE__APITOKEN="your-token" dotnet run --project src/StatusCakeMcp
+STATUSCAKE__APITOKEN="your-token" ASPNETCORE_URLS="http://localhost:5250" statuscake-mcp --http
 ```
 
-The MCP endpoint is then served over Streamable HTTP at the root path, e.g.
-`http://localhost:5250/` (the dev port from `launchSettings.json`; override with
-`ASPNETCORE_URLS`).
-
-## Connecting an MCP client
-
-Point any Streamable-HTTP-capable MCP client at the server URL. Example client
-config:
+The installed tool does not read `launchSettings.json`, so without `ASPNETCORE_URLS`
+it binds to the ASP.NET Core default (`http://localhost:5000`). Set `ASPNETCORE_URLS`
+to pin the port your client expects. Then point a Streamable-HTTP-capable client at it:
 
 ```json
 {
@@ -83,10 +104,20 @@ config:
 }
 ```
 
-## Verifying without a client
+## Build & run
 
-You can exercise the protocol with `curl`. `initialize` returns an
-`Mcp-Session-Id` header that subsequent requests must echo back:
+```bash
+dotnet build
+# stdio (default)
+STATUSCAKE__APITOKEN="your-token" dotnet run --project src/StatusCakeMcp
+# HTTP
+STATUSCAKE__APITOKEN="your-token" dotnet run --project src/StatusCakeMcp -- --http
+```
+
+## Verifying the HTTP transport with curl
+
+When running with `--http` you can exercise the protocol with `curl`. `initialize`
+returns an `Mcp-Session-Id` header that subsequent requests must echo back:
 
 ```bash
 # 1. initialize (note the Mcp-Session-Id response header)
@@ -111,7 +142,7 @@ src/StatusCakeMcp/
   Format.fs            # pure functions: paging, filtering, SSL expiry, terse formatters
   StatusCakeClient.fs  # typed HttpClient wrapper (paginates uptime/ssl; detail/periods/pause)
   Tools.fs             # the MCP tools (thin: client + Format, with error guards)
-  Program.fs           # host, DI, and MapMcp wiring
+  Program.fs           # transport selection (stdio/http), host, DI, and MCP wiring
 tests/StatusCakeMcp.Tests/
   FormatTests.fs       # xUnit tests for the pure functions in Format.fs
 ```
