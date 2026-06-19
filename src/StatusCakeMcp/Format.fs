@@ -1,6 +1,8 @@
 module StatusCakeMcp.Format
 
 open System
+open System.Net.Http
+open System.Threading.Tasks
 
 /// Case-insensitive substring match on name or website URL.
 /// A blank term matches everything.
@@ -106,3 +108,25 @@ let paginate (page: int) (limit: int) (items: 'a list) : 'a list * string option
         else items |> List.skip startIdx |> List.truncate lim
 
     window, pageFooter page limit total
+
+/// Turn an exception from a StatusCake call into a terse, actionable one-line message.
+/// `label` is the resource being accessed (e.g. "uptime", "uptime/123").
+let describeError (label: string) (ex: exn) : string =
+    match ex with
+    | :? HttpRequestException as e when e.StatusCode.HasValue ->
+        let code = int e.StatusCode.Value
+        match code with
+        | 401
+        | 403 ->
+            sprintf
+                "Error: StatusCake rejected the request (%d) — check your API token is set and valid (env STATUSCAKE__APITOKEN)."
+                code
+        | 404 -> sprintf "Error: not found (404) — no StatusCake resource at '%s'." label
+        | 429 -> sprintf "Error: rate limited by StatusCake (429) — wait a moment and retry."
+        | _ -> sprintf "Error: StatusCake returned HTTP %d for '%s'." code label
+    | :? HttpRequestException as e ->
+        // No status code => the request never completed (DNS, refused, TLS, offline).
+        sprintf "Error: could not reach StatusCake (%s) — %s" label e.Message
+    | :? TaskCanceledException
+    | :? OperationCanceledException -> sprintf "Error: request to StatusCake timed out (%s)." label
+    | e -> sprintf "Error: %s (%s)" e.Message label
