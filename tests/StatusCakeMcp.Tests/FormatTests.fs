@@ -69,15 +69,19 @@ let ``expiringWithin keeps certs due within the window, soonest first, dropping 
     Assert.Equal<string list>([ "expired"; "soon"; "edge" ], result)
 
 [<Fact>]
-let ``formatSiteLine marks up, down, and paused`` () =
-    Assert.Equal("✓ EA Sales — up", Format.formatSiteLine (check "EA Sales" "u" "up" false))
-    Assert.Equal("✗ EA MCI — down", Format.formatSiteLine (check "EA MCI" "u" "down" false))
-    Assert.Equal("⏸ EventsAIR — up (paused)", Format.formatSiteLine (check "EventsAIR" "u" "up" true))
+let ``formatSiteLine includes the id and marks up, down, and paused`` () =
+    let mk id name status paused =
+        { Id = id; Name = name; WebsiteUrl = "u"; TestType = "HTTP"; Status = status; Paused = paused }
+    Assert.Equal("✓ EA Sales — up [id 100]", Format.formatSiteLine (mk "100" "EA Sales" "up" false))
+    Assert.Equal("✗ EA MCI — down [id 101]", Format.formatSiteLine (mk "101" "EA MCI" "down" false))
+    Assert.Equal("⏸ EventsAIR — up (paused) [id 102]", Format.formatSiteLine (mk "102" "EventsAIR" "up" true))
 
 [<Fact>]
-let ``formatDownLine shows name and url`` () =
-    let c = check "EA MCI Malaysia" "https://mcimalaysia.eventsair.com/ping" "down" false
-    Assert.Equal("DOWN: EA MCI Malaysia (https://mcimalaysia.eventsair.com/ping)", Format.formatDownLine c)
+let ``formatDownLine includes name, url, and id`` () =
+    let c =
+        { Id = "262386"; Name = "EA MCI Malaysia"; WebsiteUrl = "https://mcimalaysia.eventsair.com/ping"
+          TestType = "HTTP"; Status = "down"; Paused = false }
+    Assert.Equal("DOWN: EA MCI Malaysia (https://mcimalaysia.eventsair.com/ping) [id 262386]", Format.formatDownLine c)
 
 [<Fact>]
 let ``formatDetail renders a terse multi-line summary`` () =
