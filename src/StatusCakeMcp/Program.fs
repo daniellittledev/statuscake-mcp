@@ -17,10 +17,18 @@ let private configureClient (token: string) (c: HttpClient) =
     if not (String.IsNullOrWhiteSpace token) then
         c.DefaultRequestHeaders.Authorization <- AuthenticationHeaderValue("Bearer", token)
 
+/// Warn on stderr (never stdout — that's the stdio protocol channel) if no token is set,
+/// so the cause is obvious before the first tool call fails with a 403.
+let private warnIfNoToken (token: string) =
+    if String.IsNullOrWhiteSpace token then
+        eprintfn
+            "[StatusCakeMcp] No API token configured. Set STATUSCAKE__APITOKEN (or config key StatusCake:ApiToken); tool calls will fail with 403 until it is set."
+
 /// Run as a long-lived Streamable HTTP server (for remote/shared/web-client use).
 let private runHttp (args: string[]) =
     let builder = WebApplication.CreateBuilder(args)
     let token = builder.Configuration.["StatusCake:ApiToken"]
+    warnIfNoToken token
 
     builder.Services.AddHttpClient<StatusCakeClient>(configureClient token) |> ignore
 
@@ -38,6 +46,7 @@ let private runHttp (args: string[]) =
 let private runStdio (args: string[]) =
     let builder = Host.CreateApplicationBuilder(args)
     let token = builder.Configuration.["StatusCake:ApiToken"]
+    warnIfNoToken token
 
     // stdout carries the JSON-RPC protocol, so all logs must go to stderr or they corrupt it.
     builder.Logging.AddConsole(fun o -> o.LogToStandardErrorThreshold <- LogLevel.Trace) |> ignore

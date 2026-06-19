@@ -1,6 +1,9 @@
 module StatusCakeMcp.Tests.FormatTests
 
 open System
+open System.Net
+open System.Net.Http
+open System.Threading.Tasks
 open Xunit
 open StatusCakeMcp
 
@@ -122,3 +125,33 @@ let ``pageFooter reports position and next page from a server-side total`` () =
     Assert.Equal(Some "Showing 1–50 of 120 matched · request page 2 for more", Format.pageFooter 1 50 120)
     Assert.Equal(Some "Showing 101–120 of 120 matched", Format.pageFooter 3 50 120)        // last page, no next hint
     Assert.Equal(None, Format.pageFooter 99 50 120)                                        // past the end
+
+[<Fact>]
+let ``describeError on 401/403 points at the API token and env var`` () =
+    for code in [ HttpStatusCode.Unauthorized; HttpStatusCode.Forbidden ] do
+        let ex = HttpRequestException("auth", (null: exn), Nullable code)
+        let msg = Format.describeError "uptime" ex
+        Assert.Contains(string (int code), msg)        // the status number
+        Assert.Contains("token", msg)
+        Assert.Contains("STATUSCAKE__APITOKEN", msg)   // tells the user exactly what to set
+
+[<Fact>]
+let ``describeError on 404 says not found, with the resource`` () =
+    let ex = HttpRequestException("nf", (null: exn), Nullable HttpStatusCode.NotFound)
+    let msg = Format.describeError "uptime/000000" ex
+    Assert.Contains("404", msg)
+    Assert.Contains("not found", msg)
+    Assert.Contains("uptime/000000", msg)
+
+[<Fact>]
+let ``describeError on a connection failure says it could not reach StatusCake, keeping the cause`` () =
+    let ex = HttpRequestException("No such host is known. (api.statuscake.com:443)")  // StatusCode = null
+    let msg = Format.describeError "uptime" ex
+    Assert.Contains("reach StatusCake", msg)
+    Assert.Contains("No such host is known", msg)
+
+[<Fact>]
+let ``describeError on a timeout says timed out, not 'task was canceled'`` () =
+    let msg = Format.describeError "uptime" (TaskCanceledException("A task was canceled."))
+    Assert.Contains("timed out", msg)
+    Assert.DoesNotContain("task was canceled", msg)

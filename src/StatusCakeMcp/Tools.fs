@@ -9,18 +9,14 @@ open ModelContextProtocol.Server
 
 module private ToolHelpers =
 
-    /// Run a tool body, turning HTTP/transport failures into a terse one-line message
-    /// the model can act on instead of a stack trace.
+    /// Run a tool body, turning any failure into a terse, actionable one-line message
+    /// (see Format.describeError) instead of a stack trace.
     let guard (label: string) (work: unit -> Task<string>) : Task<string> =
         task {
             try
                 return! work ()
-            with
-            | :? HttpRequestException as ex ->
-                let code =
-                    if ex.StatusCode.HasValue then string (int ex.StatusCode.Value) else "network error"
-                return sprintf "Error: %s from StatusCake (%s)" code label
-            | ex -> return sprintf "Error: %s (%s)" ex.Message label
+            with ex ->
+                return Format.describeError label ex
         }
 
     /// Render a full (client-side) list to a header + capped page + optional next-page footer.
