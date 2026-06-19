@@ -65,13 +65,15 @@ type StatusCakeTools(client: StatusCakeClient) =
         filter by a case-insensitive substring of the name or URL.")>]
     member _.CheckSitesDown
         (
-            [<Description("Case-insensitive substring of the site name or URL. Blank = all down sites.")>] [<Optional; DefaultParameterValue("")>] filter: string
+            [<Description("Case-insensitive substring of the site name or URL. Blank = all down sites.")>] [<Optional; DefaultParameterValue("")>] filter: string,
+            [<Description("1-based page number.")>] [<Optional; DefaultParameterValue(1)>] page: int,
+            [<Description("Page size, max 100.")>] [<Optional; DefaultParameterValue(50)>] limit: int
         ) : Task<string> =
         ToolHelpers.guard "uptime" (fun () ->
             task {
                 let! down = client.ListDownChecks()
-                let! all = client.ListAllChecks()
-                let total = List.length all
+                // Total comes from list metadata (one request), not a full account page-through.
+                let! total = client.CountAllChecks()
                 let matched = down |> Format.filterByName filter
 
                 if List.isEmpty matched then
@@ -79,7 +81,7 @@ type StatusCakeTools(client: StatusCakeClient) =
                         (if String.IsNullOrWhiteSpace filter then sprintf "All %d sites are up." total
                          else "No matching sites are down.")
                 else
-                    let window, footer = Format.paginate 1 50 matched
+                    let window, footer = Format.paginate page limit matched
                     let lines = window |> List.map Format.formatDownLine |> String.concat "\n"
                     let body = sprintf "%d of %d sites down:\n%s" (List.length matched) total lines
                     return

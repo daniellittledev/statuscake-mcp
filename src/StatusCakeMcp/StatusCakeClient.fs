@@ -36,6 +36,14 @@ type StatusCakeClient(httpClient: HttpClient) =
     member this.ListDownChecks() : Task<UptimeCheck list> =
         this.FetchAllPages<UptimeCheck>("uptime", "&status=down")
 
+    /// Total uptime-check count, read from list metadata with a single 1-item request
+    /// (avoids paging the whole account just to count it).
+    member _.CountAllChecks() : Task<int> =
+        task {
+            let! resp = httpClient.GetFromJsonAsync<PagedResponse<UptimeCheck>>("uptime?limit=1&page=1")
+            return resp.Metadata.TotalCount
+        }
+
     /// All SSL checks across the account.
     member this.ListSslChecks() : Task<SslCheck list> = this.FetchAllPages<SslCheck>("ssl")
 
