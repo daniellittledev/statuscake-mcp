@@ -17,6 +17,15 @@ LLM client spends as few tokens as possible:
 - [.NET SDK 8.0+](https://dotnet.microsoft.com/download)
 - A StatusCake API token ([My Account → API Keys](https://app.statuscake.com/User/Account.php))
 
+## Install
+
+Once published, install it as a .NET global tool and run the `statuscake-mcp` command:
+
+```bash
+dotnet tool install -g StatusCakeMcp
+statuscake-mcp
+```
+
 ## Configuration
 
 The server reads the API token from configuration key `StatusCake:ApiToken`.
@@ -91,6 +100,31 @@ src/StatusCakeMcp/
   Tools.fs             # the two MCP tools
   Program.fs           # host, DI, and MapMcp wiring
 ```
+
+## Releasing
+
+Publishing is automated with GitHub Actions ([`.github/workflows/publish.yml`](.github/workflows/publish.yml))
+using NuGet [Trusted Publishing](https://learn.microsoft.com/nuget/nuget-org/trusted-publishing)
+(OIDC) — there is **no long-lived NuGet API key** stored in the repo.
+
+One-time setup:
+
+1. On nuget.org, create a Trusted Publishing policy bound to repo
+   `daniellittledev/statuscake-mcp`, workflow file `publish.yml`
+   (and environment `nuget` if you use one).
+2. In the repo, add an Actions **variable** `NUGET_USER` = your nuget.org username
+   (Settings → Secrets and variables → Actions → *Variables*).
+
+To cut a release, push a version tag — the workflow derives the package version
+from the tag, packs, and pushes:
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+`CI` ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) builds every push and
+PR to `main`.
 
 ## Scope
 

@@ -2,6 +2,19 @@
 
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
+
+    <!-- Package as a .NET global/local tool: `dotnet tool install -g StatusCakeMcp` -->
+    <!-- The Web SDK disables packaging by default, so re-enable it. -->
+    <IsPackable>true</IsPackable>
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>statuscake-mcp</ToolCommandName>
+    <PackageId>StatusCakeMcp</PackageId>
+    <Version>0.1.0</Version>
+    <Authors>daniellittledev</Authors>
+    <Description>A minimal, token-efficient Model Context Protocol (MCP) server for StatusCake uptime monitoring, served over Streamable HTTP.</Description>
+    <PackageTags>mcp;statuscake;uptime;monitoring;model-context-protocol</PackageTags>
+    <!-- Run on any newer installed runtime, not just the exact 8.0 build. -->
+    <RollForward>Major</RollForward>
   </PropertyGroup>
 
   <ItemGroup>

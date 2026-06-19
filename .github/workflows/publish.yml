@@ -1,0 +1,41 @@
+name: Publish
+
+# Publishing a version tag (e.g. v0.2.0) builds, packs, and pushes to NuGet.org.
+# Authentication uses Trusted Publishing (OIDC) — no long-lived API key secret.
+on:
+  push:
+    tags: [ 'v*.*.*' ]
+
+permissions:
+  contents: read
+  id-token: write          # REQUIRED for OIDC; without it the NuGet login silently fails.
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    environment: nuget       # optional GitHub Environment; remove if you don't use one.
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Derive version from tag
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+
+      - name: Pack
+        run: dotnet pack src/StatusCakeMcp -c Release -p:Version=$VERSION -o ./artifacts
+
+      - name: NuGet login (OIDC -> short-lived API key)
+        uses: NuGet/login@v1
+        id: login
+        with:
+          user: ${{ vars.NUGET_USER }}
+
+      - name: Push
+        run: >
+          dotnet nuget push ./artifacts/*.nupkg
+          --api-key ${{ steps.login.outputs.NUGET_API_KEY }}
+          --source https://api.nuget.org/v3/index.json
+          --skip-duplicate
