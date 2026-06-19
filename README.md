@@ -4,13 +4,21 @@ A minimal, token-efficient [Model Context Protocol](https://modelcontextprotocol
 server for [StatusCake](https://www.statuscake.com), written in F# on .NET and
 served over Streamable HTTP.
 
-It exposes two tools that return terse plain-text summaries (not raw JSON) so an
-LLM client spends as few tokens as possible:
+It exposes a small set of tools that return terse plain-text summaries (not raw JSON)
+so an LLM client spends as few tokens as possible. List tools are **filtered and paged**
+so they stay cheap even on accounts with thousands of checks.
 
 | Tool | Description |
 | --- | --- |
-| `check_sites_down` | Returns only the uptime checks that are currently **down** (or confirms all are up). |
-| `list_sites` | Returns a compact one-line-per-site roster of every uptime check and its status. |
+| `list_sites` | Roster of uptime checks (glyph, name, status). Optional `filter` (name/URL substring), `status` (`up`/`down`), and `page`/`limit` (default 50, max 100). |
+| `check_sites_down` | Only the checks currently **down**, with a count of the total (or confirms all are up). Optional `filter`. |
+| `get_site` | Detail for one check by `id`: status, uptime %, check rate, last tested. |
+| `site_history` | Recent up/down periods for one check by `id`, most recent first, with durations. |
+| `check_ssl_expiring` | SSL certificates expiring within `days` (default 30), soonest first, including already expired. Paged. |
+| `pause_site` | Pause one check by `id`. **ID-only** (no name lookup) to avoid pausing the wrong check. |
+| `resume_site` | Resume (unpause) one check by `id`. **ID-only**. |
+
+Read tools resolve a check by the `id` shown in `list_sites` / `check_sites_down`.
 
 ## Prerequisites
 
@@ -23,8 +31,12 @@ Once published, install it as a .NET global tool and run the `statuscake-mcp` co
 
 ```bash
 dotnet tool install -g StatusCakeMcp
-statuscake-mcp
+STATUSCAKE__APITOKEN="your-token" ASPNETCORE_URLS="http://localhost:5250" statuscake-mcp
 ```
+
+The installed tool does not read `launchSettings.json`, so without `ASPNETCORE_URLS`
+it binds to the ASP.NET Core default (`http://localhost:5000`). Set `ASPNETCORE_URLS`
+to pin the port your MCP client expects.
 
 ## Configuration
 
@@ -95,10 +107,13 @@ curl -s http://localhost:5250/ \
 
 ```
 src/StatusCakeMcp/
-  Models.fs            # JSON record types for the /v1/uptime response
-  StatusCakeClient.fs  # typed HttpClient wrapper (paginates the uptime endpoint)
-  Tools.fs             # the two MCP tools
+  Models.fs            # JSON record types for the uptime/ssl/periods responses
+  Format.fs            # pure functions: paging, filtering, SSL expiry, terse formatters
+  StatusCakeClient.fs  # typed HttpClient wrapper (paginates uptime/ssl; detail/periods/pause)
+  Tools.fs             # the MCP tools (thin: client + Format, with error guards)
   Program.fs           # host, DI, and MapMcp wiring
+tests/StatusCakeMcp.Tests/
+  FormatTests.fs       # xUnit tests for the pure functions in Format.fs
 ```
 
 ## Releasing

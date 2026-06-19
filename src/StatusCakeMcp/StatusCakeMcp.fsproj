@@ -9,7 +9,7 @@
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>statuscake-mcp</ToolCommandName>
     <PackageId>StatusCakeMcp</PackageId>
-    <Version>0.1.0</Version>
+    <Version>0.2.0</Version>
     <Authors>daniellittledev</Authors>
     <Description>A minimal, token-efficient Model Context Protocol (MCP) server for StatusCake uptime monitoring, served over Streamable HTTP.</Description>
     <PackageTags>mcp;statuscake;uptime;monitoring;model-context-protocol</PackageTags>
@@ -19,6 +19,7 @@
 
   <ItemGroup>
     <Compile Include="Models.fs" />
+    <Compile Include="Format.fs" />
     <Compile Include="StatusCakeClient.fs" />
     <Compile Include="Tools.fs" />
     <Compile Include="Program.fs" />
