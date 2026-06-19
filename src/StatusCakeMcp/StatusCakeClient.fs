@@ -30,35 +30,35 @@ type StatusCakeClient(httpClient: HttpClient) =
             return List.ofSeq results
         }
 
-    /// Optional `&status=` query fragment (server-side up/down filter).
-    static member private statusQuery(status: string) =
-        if String.IsNullOrWhiteSpace status then "" else sprintf "&status=%s" (status.Trim().ToLowerInvariant())
-
-    /// All uptime checks across the account.
-    member this.ListAllChecks() : Task<UptimeCheck list> = this.FetchAllPages<UptimeCheck>("uptime")
+    /// Extra query fragment for uptime list views: optional `&status=` plus `&nouptime=true`.
+    /// These views never display the uptime %, so we tell the API to skip computing it.
+    static member private listQuery(status: string) =
+        let statusQ =
+            if String.IsNullOrWhiteSpace status then "" else sprintf "&status=%s" (status.Trim().ToLowerInvariant())
+        statusQ + "&nouptime=true"
 
     /// All uptime checks, optionally server-side filtered by status ("up"/"down").
     member this.ListChecks(status: string) : Task<UptimeCheck list> =
-        this.FetchAllPages<UptimeCheck>("uptime", StatusCakeClient.statusQuery status)
+        this.FetchAllPages<UptimeCheck>("uptime", StatusCakeClient.listQuery status)
 
     /// A single server-side page of uptime checks (optionally status-filtered),
     /// returned with the account-wide total from the response metadata.
     member _.GetChecksPage(status: string, page: int, limit: int) : Task<UptimeCheck list * int> =
         task {
-            let url = sprintf "uptime?limit=%d&page=%d%s" limit page (StatusCakeClient.statusQuery status)
+            let url = sprintf "uptime?limit=%d&page=%d%s" limit page (StatusCakeClient.listQuery status)
             let! resp = httpClient.GetFromJsonAsync<PagedResponse<UptimeCheck>>(url)
             return List.ofArray resp.Data, resp.Metadata.TotalCount
         }
 
     /// Only checks currently reported as down (server-side filtered).
     member this.ListDownChecks() : Task<UptimeCheck list> =
-        this.FetchAllPages<UptimeCheck>("uptime", "&status=down")
+        this.FetchAllPages<UptimeCheck>("uptime", StatusCakeClient.listQuery "down")
 
     /// Total uptime-check count, read from list metadata with a single 1-item request
     /// (avoids paging the whole account just to count it).
     member _.CountAllChecks() : Task<int> =
         task {
-            let! resp = httpClient.GetFromJsonAsync<PagedResponse<UptimeCheck>>("uptime?limit=1&page=1")
+            let! resp = httpClient.GetFromJsonAsync<PagedResponse<UptimeCheck>>("uptime?limit=1&page=1&nouptime=true")
             return resp.Metadata.TotalCount
         }
 
