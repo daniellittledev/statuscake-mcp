@@ -115,3 +115,10 @@ let ``paginate clamps limit to 100 and page to at least 1`` () =
     let items = [ 1..250 ]
     let window, _ = Format.paginate 0 9999 items
     Assert.Equal<int list>([ 1..100 ], window)
+
+[<Fact>]
+let ``pageFooter reports position and next page from a server-side total`` () =
+    Assert.Equal(None, Format.pageFooter 1 50 30)                                          // fits one page
+    Assert.Equal(Some "Showing 1–50 of 120 matched · request page 2 for more", Format.pageFooter 1 50 120)
+    Assert.Equal(Some "Showing 101–120 of 120 matched", Format.pageFooter 3 50 120)        // last page, no next hint
+    Assert.Equal(None, Format.pageFooter 99 50 120)                                        // past the end

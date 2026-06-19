@@ -23,7 +23,7 @@ module private ToolHelpers =
             | ex -> return sprintf "Error: %s (%s)" ex.Message label
         }
 
-    /// Render a list to a header + capped page + optional next-page footer.
+    /// Render a full (client-side) list to a header + capped page + optional next-page footer.
     let renderList (noun: string) (formatter: 'a -> string) (page: int) (limit: int) (items: 'a list) : string =
         if List.isEmpty items then
             sprintf "No %s." noun
@@ -33,6 +33,16 @@ module private ToolHelpers =
             match footer with
             | Some f -> sprintf "%s\n%s" lines f
             | None -> sprintf "%d %s:\n%s" (List.length items) noun lines
+
+    /// Render an already-server-paged list, using the account-wide `total` for the footer.
+    let renderPage (noun: string) (formatter: 'a -> string) (page: int) (limit: int) (total: int) (items: 'a list) : string =
+        if List.isEmpty items then
+            sprintf "No %s." noun
+        else
+            let lines = items |> List.map formatter |> String.concat "\n"
+            match Format.pageFooter page limit total with
+            | Some f -> sprintf "%s\n%s" lines f
+            | None -> sprintf "%d %s:\n%s" total noun lines
 
 /// MCP tools exposing StatusCake uptime and SSL data.
 /// Output is deliberately terse plain text to keep token usage low.
@@ -52,12 +62,16 @@ type StatusCakeTools(client: StatusCakeClient) =
         ) : Task<string> =
         ToolHelpers.guard "uptime" (fun () ->
             task {
-                let! all = client.ListAllChecks()
-                let byStatus =
-                    if String.IsNullOrWhiteSpace status then all
-                    else all |> List.filter (fun c -> c.Status = status.Trim().ToLowerInvariant())
-                let matched = byStatus |> Format.filterByName filter
-                return ToolHelpers.renderList "sites" Format.formatSiteLine page limit matched
+                if String.IsNullOrWhiteSpace filter then
+                    // No name filter: page server-side (status is a server filter too), one request.
+                    let! items, total = client.GetChecksPage(status, page, limit)
+                    return ToolHelpers.renderPage "sites" Format.formatSiteLine page limit total items
+                else
+                    // Name filter has no server-side equivalent: fetch all (status-filtered server-side),
+                    // then match and page client-side.
+                    let! all = client.ListChecks(status)
+                    let matched = all |> Format.filterByName filter
+                    return ToolHelpers.renderList "sites" Format.formatSiteLine page limit matched
             })
 
     [<McpServerTool; Description("Return only the uptime checks that are currently DOWN, with a count \

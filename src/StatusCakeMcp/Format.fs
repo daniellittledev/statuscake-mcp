@@ -77,26 +77,32 @@ let formatSslLine (now: DateTimeOffset) (s: SslCheck) : string =
         let daysLeft = int (floor (s.ValidUntil - now).TotalDays)
         sprintf "%s — %dd left (%s)" s.WebsiteUrl daysLeft date
 
+/// Footer describing the current page's position within `total` matches, and whether
+/// more pages exist. None when it all fits on one page or the page is past the end.
+/// `limit` is clamped to 1..100; `page` is clamped to >= 1.
+let pageFooter (page: int) (limit: int) (total: int) : string option =
+    let limit = max 1 (min 100 limit)
+    let page = max 1 page
+    let startIdx = (page - 1) * limit
+    if total <= limit || startIdx >= total then
+        None
+    else
+        let fromN = startIdx + 1
+        let toN = min total (startIdx + limit)
+        let baseLine = sprintf "Showing %d–%d of %d matched" fromN toN total
+        if toN < total then Some(sprintf "%s · request page %d for more" baseLine (page + 1))
+        else Some baseLine
+
 /// Slice an already-filtered list to a single page window.
 /// Returns the window plus an optional footer describing position and whether more pages exist.
 /// `limit` is clamped to 1..100; `page` is clamped to >= 1.
 let paginate (page: int) (limit: int) (items: 'a list) : 'a list * string option =
     let total = List.length items
-    let limit = max 1 (min 100 limit)
-    let page = max 1 page
-    let startIdx = (page - 1) * limit
+    let lim = max 1 (min 100 limit)
+    let pg = max 1 page
+    let startIdx = (pg - 1) * lim
     let window =
         if startIdx >= total then []
-        else items |> List.skip startIdx |> List.truncate limit
+        else items |> List.skip startIdx |> List.truncate lim
 
-    let footer =
-        if total <= limit then
-            None
-        else
-            let fromN = startIdx + 1
-            let toN = startIdx + List.length window
-            let baseLine = sprintf "Showing %d–%d of %d matched" fromN toN total
-            if toN < total then Some(sprintf "%s · request page %d for more" baseLine (page + 1))
-            else Some baseLine
-
-    window, footer
+    window, pageFooter page limit total

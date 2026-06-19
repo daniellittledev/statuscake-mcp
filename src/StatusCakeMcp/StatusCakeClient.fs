@@ -1,5 +1,6 @@
 namespace StatusCakeMcp
 
+open System
 open System.Collections.Generic
 open System.Net.Http
 open System.Net.Http.Json
@@ -29,8 +30,25 @@ type StatusCakeClient(httpClient: HttpClient) =
             return List.ofSeq results
         }
 
+    /// Optional `&status=` query fragment (server-side up/down filter).
+    static member private statusQuery(status: string) =
+        if String.IsNullOrWhiteSpace status then "" else sprintf "&status=%s" (status.Trim().ToLowerInvariant())
+
     /// All uptime checks across the account.
     member this.ListAllChecks() : Task<UptimeCheck list> = this.FetchAllPages<UptimeCheck>("uptime")
+
+    /// All uptime checks, optionally server-side filtered by status ("up"/"down").
+    member this.ListChecks(status: string) : Task<UptimeCheck list> =
+        this.FetchAllPages<UptimeCheck>("uptime", StatusCakeClient.statusQuery status)
+
+    /// A single server-side page of uptime checks (optionally status-filtered),
+    /// returned with the account-wide total from the response metadata.
+    member _.GetChecksPage(status: string, page: int, limit: int) : Task<UptimeCheck list * int> =
+        task {
+            let url = sprintf "uptime?limit=%d&page=%d%s" limit page (StatusCakeClient.statusQuery status)
+            let! resp = httpClient.GetFromJsonAsync<PagedResponse<UptimeCheck>>(url)
+            return List.ofArray resp.Data, resp.Metadata.TotalCount
+        }
 
     /// Only checks currently reported as down (server-side filtered).
     member this.ListDownChecks() : Task<UptimeCheck list> =
