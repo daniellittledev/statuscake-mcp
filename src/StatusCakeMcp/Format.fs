@@ -61,11 +61,11 @@ let formatSiteLine (c: UptimeCheck) : string =
         elif c.Status = "up" then "✓"
         else "✗"
     let suffix = if c.Paused then " (paused)" else ""
-    sprintf "%s %s — %s%s" glyph c.Name c.Status suffix
+    sprintf "%s %s — %s%s [id %s]" glyph c.Name c.Status suffix c.Id
 
-/// One line describing a down check: "DOWN: name (url)".
+/// One line describing a down check: "DOWN: name (url) [id ...]".
 let formatDownLine (c: UptimeCheck) : string =
-    sprintf "DOWN: %s (%s)" c.Name c.WebsiteUrl
+    sprintf "DOWN: %s (%s) [id %s]" c.Name c.WebsiteUrl c.Id
 
 /// Multi-line terse view of a single check's detail.
 let formatDetail (d: UptimeCheckDetail) : string =
