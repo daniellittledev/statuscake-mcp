@@ -50,6 +50,32 @@ it on demand — point the client at the command and pass the token via its envi
 
 See [Transports](#transports) below to run it as an HTTP server instead.
 
+## Claude Desktop extension (.mcpb)
+
+You can install the server into Claude Desktop as a one-click extension instead of
+installing the .NET tool. The bundle ships a self-contained binary, so the host needs
+neither .NET nor anything else on `PATH`.
+
+Each tagged release attaches a prebuilt `statuscake-mcp.mcpb` you can download directly
+from the [Releases](https://github.com/daniellittledev/statuscake-mcp/releases) page, so
+most users can skip the build below.
+
+To build it yourself (requires the .NET SDK; uses the official `mcpb` packer via `npx`
+when available, otherwise zips with PowerShell):
+
+```pwsh
+pwsh mcpb/build.ps1
+```
+
+This produces `dist/statuscake-mcp.mcpb`. The packaging files live under [`mcpb/`](mcpb/)
+([`manifest.json`](mcpb/manifest.json), [`build.ps1`](mcpb/build.ps1)). The current
+binary bundle targets **Windows x64**.
+
+To install it: open Claude Desktop → **Settings → Extensions → Advanced settings →
+Install Extension**, choose `dist/statuscake-mcp.mcpb`, and when prompted paste your
+**StatusCake API Token**. The token is stored securely by Claude Desktop and passed to
+the server as `STATUSCAKE__APITOKEN`; it is never written into the manifest.
+
 ## Configuration
 
 The server reads the API token from configuration key `StatusCake:ApiToken`.
@@ -168,6 +194,10 @@ from the tag, packs, and pushes:
 git tag v0.1.0
 git push origin v0.1.0
 ```
+
+The same tag also triggers [`Release`](.github/workflows/release.yml), which builds the
+Claude Desktop extension (`statuscake-mcp.mcpb`) at that version and attaches it to a
+GitHub Release of the same name. It needs no secrets beyond the automatic `GITHUB_TOKEN`.
 
 `CI` ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) builds every push and
 PR to `main`.

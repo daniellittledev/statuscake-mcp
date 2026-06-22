@@ -39,6 +39,11 @@ ScaffoldingReadMe.txt
 # dotenv environment variables file
 .env
 
+# MCPB / Claude Desktop extension build artifacts
+dist/
+mcpb/stage/
+*.mcpb
+
 # Others
 ~$*
 *~
