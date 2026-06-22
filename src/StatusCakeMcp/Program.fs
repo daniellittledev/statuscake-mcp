@@ -1,36 +1,19 @@
 module StatusCakeMcp.Program
 
 open System
-open System.Net.Http
-open System.Net.Http.Headers
 open Microsoft.AspNetCore.Builder
-open Microsoft.Extensions.Configuration
 open Microsoft.Extensions.DependencyInjection
 open Microsoft.Extensions.Hosting
 open Microsoft.Extensions.Logging
 open StatusCakeMcp
 
-/// Configure the typed StatusCake HttpClient. Token comes from config key
-/// "StatusCake:ApiToken" (env var STATUSCAKE__APITOKEN).
-let private configureClient (token: string) (c: HttpClient) =
-    c.BaseAddress <- Uri "https://api.statuscake.com/v1/"
-    if not (String.IsNullOrWhiteSpace token) then
-        c.DefaultRequestHeaders.Authorization <- AuthenticationHeaderValue("Bearer", token)
-
-/// Warn on stderr (never stdout — that's the stdio protocol channel) if no token is set,
-/// so the cause is obvious before the first tool call fails with a 403.
-let private warnIfNoToken (token: string) =
-    if String.IsNullOrWhiteSpace token then
-        eprintfn
-            "[StatusCakeMcp] No API token configured. Set STATUSCAKE__APITOKEN (or config key StatusCake:ApiToken); tool calls will fail with 403 until it is set."
-
 /// Run as a long-lived Streamable HTTP server (for remote/shared/web-client use).
 let private runHttp (args: string[]) =
     let builder = WebApplication.CreateBuilder(args)
     let token = builder.Configuration.["StatusCake:ApiToken"]
-    warnIfNoToken token
+    Cli.warnIfNoToken token
 
-    builder.Services.AddHttpClient<StatusCakeClient>(configureClient token) |> ignore
+    builder.Services.AddHttpClient<StatusCakeClient>(Cli.configureClient token) |> ignore
 
     builder.Services
         .AddMcpServer()
@@ -42,16 +25,16 @@ let private runHttp (args: string[]) =
     app.MapMcp() |> ignore
     app.Run()
 
-/// Run over stdio (the default): the MCP client launches and owns the process.
+/// Run over stdio: the MCP client launches and owns the process.
 let private runStdio (args: string[]) =
     let builder = Host.CreateApplicationBuilder(args)
     let token = builder.Configuration.["StatusCake:ApiToken"]
-    warnIfNoToken token
+    Cli.warnIfNoToken token
 
     // stdout carries the JSON-RPC protocol, so all logs must go to stderr or they corrupt it.
     builder.Logging.AddConsole(fun o -> o.LogToStandardErrorThreshold <- LogLevel.Trace) |> ignore
 
-    builder.Services.AddHttpClient<StatusCakeClient>(configureClient token) |> ignore
+    builder.Services.AddHttpClient<StatusCakeClient>(Cli.configureClient token) |> ignore
 
     builder.Services
         .AddMcpServer()
@@ -63,16 +46,22 @@ let private runStdio (args: string[]) =
 
 [<EntryPoint>]
 let main args =
-    // Default to stdio; opt into HTTP with `--http` or STATUSCAKE__TRANSPORT=http.
-    let wantsHttp =
-        Array.contains "--http" args
-        || String.Equals(
-            Environment.GetEnvironmentVariable "STATUSCAKE__TRANSPORT",
-            "http",
-            StringComparison.OrdinalIgnoreCase)
+    // CLI is the default. The `mcp` subcommand runs the MCP server instead:
+    //   statuscake-mcp mcp           -> stdio (the client launches the process)
+    //   statuscake-mcp mcp --http    -> Streamable HTTP (or STATUSCAKE__TRANSPORT=http)
+    match Array.toList args with
+    | "mcp" :: rest ->
+        let restArr = List.toArray rest
+        let wantsHttp =
+            Array.contains "--http" restArr
+            || String.Equals(
+                Environment.GetEnvironmentVariable "STATUSCAKE__TRANSPORT",
+                "http",
+                StringComparison.OrdinalIgnoreCase)
 
-    // Strip our own flag so it isn't fed to the configuration command-line parser.
-    let hostArgs = args |> Array.filter (fun a -> a <> "--http")
+        // Strip our own flag so it isn't fed to the configuration command-line parser.
+        let hostArgs = restArr |> Array.filter (fun a -> a <> "--http")
 
-    if wantsHttp then runHttp hostArgs else runStdio hostArgs
-    0
+        if wantsHttp then runHttp hostArgs else runStdio hostArgs
+        0
+    | _ -> Cli.run args

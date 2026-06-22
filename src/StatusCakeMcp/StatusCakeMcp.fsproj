@@ -11,7 +11,7 @@
     <PackageId>StatusCakeMcp</PackageId>
     <Version>0.2.3</Version>
     <Authors>daniellittledev</Authors>
-    <Description>A minimal, token-efficient Model Context Protocol (MCP) server for StatusCake uptime monitoring, served over Streamable HTTP.</Description>
+    <Description>A minimal, token-efficient StatusCake uptime monitoring tool — a command-line client by default, and a Model Context Protocol (MCP) server (stdio or Streamable HTTP) under the `mcp` subcommand.</Description>
     <PackageTags>mcp;statuscake;uptime;monitoring;model-context-protocol</PackageTags>
     <!-- Run on any newer installed runtime, not just the exact 8.0 build. -->
     <RollForward>Major</RollForward>
@@ -21,7 +21,9 @@
     <Compile Include="Models.fs" />
     <Compile Include="Format.fs" />
     <Compile Include="StatusCakeClient.fs" />
+    <Compile Include="Commands.fs" />
     <Compile Include="Tools.fs" />
+    <Compile Include="Cli.fs" />
     <Compile Include="Program.fs" />
   </ItemGroup>
 
