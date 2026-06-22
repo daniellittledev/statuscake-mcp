@@ -1,0 +1,55 @@
+{
+  "$schema": "https://raw.githubusercontent.com/anthropics/mcpb/main/dist/mcpb-manifest.schema.json",
+  "manifest_version": "0.3",
+  "name": "statuscake-mcp",
+  "display_name": "StatusCake",
+  "version": "0.2.3",
+  "description": "A minimal, token-efficient MCP server for StatusCake uptime monitoring.",
+  "long_description": "Exposes a small set of tools for StatusCake uptime monitoring that return terse plain-text summaries (not raw JSON) so an LLM client spends as few tokens as possible: list_sites, check_sites_down, get_site, site_history, check_ssl_expiring, pause_site, and resume_site. List tools are filtered and paged so they stay cheap on accounts with thousands of checks. Runs locally over stdio as a self-contained binary; no .NET runtime install is required.",
+  "author": {
+    "name": "daniellittledev",
+    "url": "https://github.com/daniellittledev"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/daniellittledev/statuscake-mcp"
+  },
+  "homepage": "https://github.com/daniellittledev/statuscake-mcp",
+  "documentation": "https://github.com/daniellittledev/statuscake-mcp#readme",
+  "support": "https://github.com/daniellittledev/statuscake-mcp/issues",
+  "server": {
+    "type": "binary",
+    "entry_point": "server/StatusCakeMcp.exe",
+    "mcp_config": {
+      "command": "${__dirname}/server/StatusCakeMcp.exe",
+      "args": [],
+      "env": {
+        "STATUSCAKE__APITOKEN": "${user_config.api_token}"
+      }
+    }
+  },
+  "tools": [
+    { "name": "list_sites", "description": "Roster of uptime checks (glyph, name, status), with optional filter/status/paging." },
+    { "name": "check_sites_down", "description": "Only the checks currently down, with a total count (or confirms all are up)." },
+    { "name": "get_site", "description": "Detail for one check by id: status, uptime %, check rate, last tested." },
+    { "name": "site_history", "description": "Recent up/down periods for one check by id, most recent first, with durations." },
+    { "name": "check_ssl_expiring", "description": "SSL certificates expiring within N days (default 30), soonest first. Paged." },
+    { "name": "pause_site", "description": "Pause one check by id (id-only, no name lookup)." },
+    { "name": "resume_site", "description": "Resume (unpause) one check by id (id-only)." }
+  ],
+  "keywords": ["mcp", "statuscake", "uptime", "monitoring", "model-context-protocol"],
+  "license": "MIT",
+  "user_config": {
+    "api_token": {
+      "type": "string",
+      "title": "StatusCake API Token",
+      "description": "API token from StatusCake (My Account → API Keys). Used as a Bearer token; tool calls return 403 until it is set.",
+      "required": true,
+      "sensitive": true
+    }
+  },
+  "compatibility": {
+    "platforms": ["win32"],
+    "runtimes": {}
+  }
+}
