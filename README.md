@@ -1,25 +1,27 @@
 # statuscake-mcp
 
-A minimal, token-efficient [Model Context Protocol](https://modelcontextprotocol.io)
-server for [StatusCake](https://www.statuscake.com), written in F# on .NET. It speaks
-**stdio by default** (the client launches it on demand) and can also run as a
-**Streamable HTTP** server for remote or shared use.
+A minimal, token-efficient tool for [StatusCake](https://www.statuscake.com) uptime
+monitoring, written in F# on .NET. It works two ways from one binary:
 
-It exposes a small set of tools that return terse plain-text summaries (not raw JSON)
-so an LLM client spends as few tokens as possible. List tools are **filtered and paged**
+- a **command-line tool** (the default) — `statuscake-mcp down`, `statuscake-mcp get 123`;
+- a **[Model Context Protocol](https://modelcontextprotocol.io) server** — `statuscake-mcp mcp`
+  — for Claude Desktop and other LLM clients (stdio, or Streamable HTTP).
+
+Both front-ends share the same logic and return terse plain-text summaries (not raw JSON)
+so an LLM client spends as few tokens as possible. List commands are **filtered and paged**
 so they stay cheap even on accounts with thousands of checks.
 
-| Tool | Description |
-| --- | --- |
-| `list_sites` | Roster of uptime checks (glyph, name, status). Optional `filter` (name/URL substring), `status` (`up`/`down`), and `page`/`limit` (default 50, max 100). |
-| `check_sites_down` | Only the checks currently **down**, with a count of the total (or confirms all are up). Optional `filter`. |
-| `get_site` | Detail for one check by `id`: status, uptime %, check rate, last tested. |
-| `site_history` | Recent up/down periods for one check by `id`, most recent first, with durations. |
-| `check_ssl_expiring` | SSL certificates expiring within `days` (default 30), soonest first, including already expired. Paged. |
-| `pause_site` | Pause one check by `id`. **ID-only** (no name lookup) to avoid pausing the wrong check. |
-| `resume_site` | Resume (unpause) one check by `id`. **ID-only**. |
+| Command | MCP tool | Description |
+| --- | --- | --- |
+| `list` | `list_sites` | Roster of uptime checks (glyph, name, status). Optional `--filter` (name/URL substring), `--status` (`up`/`down`/`paused`), and `--page`/`--limit` (default 50, max 100). |
+| `down` | `check_sites_down` | Only the checks currently **down**, with a count of the total (or confirms all are up). Optional `--filter`. |
+| `get <id>` | `get_site` | Detail for one check: status, uptime %, check rate, last tested. |
+| `history <id>` | `site_history` | Recent up/down periods for one check, most recent first, with durations (`--limit`, default 10). |
+| `ssl` | `check_ssl_expiring` | SSL certificates expiring within `--days` (default 30), soonest first, including already expired. Paged. |
+| `pause <id>` | `pause_site` | Pause one check. **ID-only** (no name lookup) to avoid pausing the wrong check. |
+| `resume <id>` | `resume_site` | Resume (unpause) one check. **ID-only**. |
 
-Read tools resolve a check by the `id` shown in `list_sites` / `check_sites_down`.
+Commands that act on one check take the `id` shown in `list` / `down`.
 
 ## Prerequisites
 
@@ -34,21 +36,45 @@ Install it as a .NET global tool:
 dotnet tool install -g StatusCakeMcp
 ```
 
-The `statuscake-mcp` command runs over **stdio** by default, so an MCP client launches
-it on demand — point the client at the command and pass the token via its environment:
+## CLI usage
+
+Running `statuscake-mcp` with a command is the default. Set the API token in your
+environment (see [Configuration](#configuration)), then:
+
+```bash
+statuscake-mcp down                       # anything actively down?
+statuscake-mcp list --status down         # the roster, down checks only
+statuscake-mcp list --filter mci --limit 20
+statuscake-mcp get 218518                 # detail for one check
+statuscake-mcp history 218518 --limit 5   # recent up/down periods
+statuscake-mcp ssl --days 14              # certs expiring within 14 days
+statuscake-mcp pause 218518               # pause / resume one check
+statuscake-mcp resume 218518
+statuscake-mcp --help                     # full command list
+```
+
+Exit codes: `0` success · `1` API/runtime error (auth, not found, timeout) · `2` usage
+error (unknown command or bad arguments). Errors print to stderr; output prints to stdout.
+
+## Use as an MCP server
+
+The same binary runs as an MCP server under the **`mcp`** subcommand — point the client
+at the command with `args: ["mcp"]` and pass the token via its environment:
 
 ```json
 {
   "mcpServers": {
     "statuscake": {
       "command": "statuscake-mcp",
+      "args": ["mcp"],
       "env": { "STATUSCAKE__APITOKEN": "your-statuscake-api-token" }
     }
   }
 }
 ```
 
-See [Transports](#transports) below to run it as an HTTP server instead.
+`statuscake-mcp mcp` speaks **stdio** so the client launches it on demand. See
+[Transports](#transports) below to run it as an HTTP server instead.
 
 ## Claude Desktop extension (.mcpb)
 
@@ -96,23 +122,23 @@ Never commit the token. `.env` is already git-ignored.
 
 ## Transports
 
-The server selects its transport at startup:
+The `mcp` subcommand selects its transport at startup:
 
 | Transport | When | How to select |
 | --- | --- | --- |
-| **stdio** | local use; the MCP client launches the process | default |
-| **Streamable HTTP** | remote, shared, or web-based clients | `--http` flag, or `STATUSCAKE__TRANSPORT=http` |
+| **stdio** | local use; the MCP client launches the process | `statuscake-mcp mcp` |
+| **Streamable HTTP** | remote, shared, or web-based clients | `statuscake-mcp mcp --http`, or `STATUSCAKE__TRANSPORT=http` |
 
-### stdio (default)
+### stdio
 
-Nothing to start manually — the client spawns `statuscake-mcp` and talks to it over
+Nothing to start manually — the client spawns `statuscake-mcp mcp` and talks to it over
 stdin/stdout. Logs go to stderr so they never corrupt the protocol stream. Use the
-client config shown under [Install](#install).
+client config shown under [Use as an MCP server](#use-as-an-mcp-server).
 
 ### HTTP
 
 ```bash
-STATUSCAKE__APITOKEN="your-token" ASPNETCORE_URLS="http://localhost:5250" statuscake-mcp --http
+STATUSCAKE__APITOKEN="your-token" ASPNETCORE_URLS="http://localhost:5250" statuscake-mcp mcp --http
 ```
 
 The installed tool does not read `launchSettings.json`, so without `ASPNETCORE_URLS`
@@ -134,15 +160,17 @@ to pin the port your client expects. Then point a Streamable-HTTP-capable client
 
 ```bash
 dotnet build
-# stdio (default)
-STATUSCAKE__APITOKEN="your-token" dotnet run --project src/StatusCakeMcp
-# HTTP
-STATUSCAKE__APITOKEN="your-token" dotnet run --project src/StatusCakeMcp -- --http
+# CLI (default)
+STATUSCAKE__APITOKEN="your-token" dotnet run --project src/StatusCakeMcp -- down
+# MCP over stdio
+STATUSCAKE__APITOKEN="your-token" dotnet run --project src/StatusCakeMcp -- mcp
+# MCP over HTTP
+STATUSCAKE__APITOKEN="your-token" dotnet run --project src/StatusCakeMcp -- mcp --http
 ```
 
 ## Verifying the HTTP transport with curl
 
-When running with `--http` you can exercise the protocol with `curl`. `initialize`
+When running with `mcp --http` you can exercise the protocol with `curl`. `initialize`
 returns an `Mcp-Session-Id` header that subsequent requests must echo back:
 
 ```bash
@@ -167,10 +195,13 @@ src/StatusCakeMcp/
   Models.fs            # JSON record types for the uptime/ssl/periods responses
   Format.fs            # pure functions: paging, filtering, SSL expiry, terse formatters
   StatusCakeClient.fs  # typed HttpClient wrapper (paginates uptime/ssl; detail/periods/pause)
-  Tools.fs             # the MCP tools (thin: client + Format, with error guards)
-  Program.fs           # transport selection (stdio/http), host, DI, and MCP wiring
+  Commands.fs          # shared command core: one operation per command, client + Format
+  Tools.fs             # the MCP tools (thin: guard + Commands)
+  Cli.fs               # the CLI: arg parsing, dispatch to Commands, exit codes
+  Program.fs           # routes mcp vs cli; MCP host, DI, and transport selection
 tests/StatusCakeMcp.Tests/
   FormatTests.fs       # xUnit tests for the pure functions in Format.fs
+  CliTests.fs          # xUnit tests for the CLI argument parser
 ```
 
 ## Releasing
