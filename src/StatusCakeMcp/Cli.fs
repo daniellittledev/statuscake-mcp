@@ -191,6 +191,8 @@ module Cli =
                 ConfigurationBuilder()
                     .SetBasePath(AppContext.BaseDirectory)
                     .AddJsonFile("appsettings.json", optional = true)
+                    // `dotnet user-secrets set StatusCake:ApiToken ...` works for the CLI too.
+                    .AddUserSecrets(typeof<Command>.Assembly, optional = true)
                     .AddEnvironmentVariables()
                     .Build()
 

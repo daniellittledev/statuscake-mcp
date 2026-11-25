@@ -36,6 +36,9 @@ Install it as a .NET global tool:
 dotnet tool install -g StatusCakeMcp
 ```
 
+The CLI (and the Claude Code skill) needs **0.3.0 or later**. Earlier versions are MCP-only,
+so upgrade an existing install with `dotnet tool update -g StatusCakeMcp`.
+
 ## CLI usage
 
 Running `statuscake-mcp` with a command is the default. Set the API token in your
@@ -144,10 +147,17 @@ Set it via an environment variable (double-underscore separator):
 export STATUSCAKE__APITOKEN="your-statuscake-api-token"
 ```
 
-In local development you can instead use [user-secrets](https://learn.microsoft.com/aspnet/core/security/app-secrets):
+The environment variable is the supported way to configure the installed tool. As of
+0.3.0 the CLI no longer reads an `appsettings.json` from your current directory, only the
+one shipped next to the binary, so a token kept in a local `appsettings.json` must move
+to the environment variable (or user-secrets, below).
+
+In local development you can instead use [user-secrets](https://learn.microsoft.com/aspnet/core/security/app-secrets).
+The CLI always reads them. The MCP host only reads them in the Development environment:
+`dotnet run` sets `ASPNETCORE_ENVIRONMENT=Development`, which covers `mcp --http`; for
+stdio also set `DOTNET_ENVIRONMENT=Development`. Environment variables take precedence.
 
 ```bash
-dotnet user-secrets init --project src/StatusCakeMcp
 dotnet user-secrets set "StatusCake:ApiToken" "your-statuscake-api-token" --project src/StatusCakeMcp
 ```
 

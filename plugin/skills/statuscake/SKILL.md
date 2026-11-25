@@ -55,9 +55,12 @@ Output goes to stdout; errors go to stderr.
 
 ## Setup problems
 
+- **Version 0.3.0 or later is required.** Older releases are MCP-only: they ignore the
+  command and start an MCP server that waits on stdin, so the call hangs or prints JSON-RPC.
+  If that happens, stop and tell the user to run `dotnet tool update -g StatusCakeMcp`.
 - **`statuscake-mcp: command not found`** → the .NET tool isn't installed. Tell the user to run
   `dotnet tool install -g StatusCakeMcp` (needs the .NET 8+ SDK, and `~/.dotnet/tools` on `PATH`).
-  Don't install it without asking.
+  Don't install or update it without asking.
 - **"No API token configured" / 403** → `STATUSCAKE__APITOKEN` isn't set in the environment
   Claude Code runs commands in. Suggest adding it to the `env` block of
   `~/.claude/settings.json` (or exporting it in their shell profile). Never ask the user to
