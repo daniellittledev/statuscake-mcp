@@ -22,6 +22,9 @@ jobs:
       - name: Derive version from tag
         run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
 
+      - name: Check versions match the tag
+        run: scripts/check-versions.sh "$VERSION"
+
       - name: Build .mcpb
         run: pwsh mcpb/build.ps1 -Version "$VERSION"
 

@@ -25,24 +25,37 @@ Commands that act on one check take the `id` shown in `list` / `down`.
 
 ## Prerequisites
 
-- [.NET SDK 8.0+](https://dotnet.microsoft.com/download)
+- [.NET 10 SDK](https://dotnet.microsoft.com/download) for `dotnet tool execute`
+  (the tool itself targets .NET 8 and runs on any newer runtime)
 - A StatusCake API token ([My Account → API Keys](https://app.statuscake.com/User/Account.php))
 
 ## Install
 
-Install it as a .NET global tool:
+Nothing to install. Run it through the signed `dotnet` host with a pinned version; the
+package is downloaded to the NuGet cache on first use:
 
 ```bash
-dotnet tool install -g StatusCakeMcp
+dotnet tool execute StatusCakeMcp@0.3.0 --yes -- down
 ```
 
-The CLI (and the Claude Code skill) needs **0.3.0 or later**. Earlier versions are MCP-only,
-so upgrade an existing install with `dotnet tool update -g StatusCakeMcp`.
+The CLI (and the Claude Code skill) needs **0.3.0 or later**; earlier versions are MCP-only.
+To upgrade, change the version you pass. Note that `dotnet tool execute` checks the NuGet
+feed on every run, even when the package is cached, so nuget.org must be reachable.
+
+> **Managed Windows:** don't install it as a global tool (`dotnet tool install -g`) or
+> point anything at the `.exe` in `%USERPROFILE%\.dotnet\tools`. Corporate Defender attack
+> surface reduction rules block those unsigned per-user launchers. Use `dotnet tool execute`
+> as above, and use `dotnet` rather than `dnx`: `dnx` is a `.cmd` file, which Claude Code
+> can't start directly on Windows.
+
+Where launchers aren't blocked you can still install a global tool and get a shorter
+command: `dotnet tool install -g StatusCakeMcp` gives you `statuscake-mcp`.
 
 ## CLI usage
 
-Running `statuscake-mcp` with a command is the default. Set the API token in your
-environment (see [Configuration](#configuration)), then:
+Set the API token in your environment (see [Configuration](#configuration)), then run a
+command. The examples use the global-tool name `statuscake-mcp`; with `dotnet tool execute`,
+replace it with `dotnet tool execute StatusCakeMcp@0.3.0 --yes --`.
 
 ```bash
 statuscake-mcp down                       # anything actively down?
@@ -77,9 +90,10 @@ On older Claude Code versions, add the marketplace first:
 /plugin install statuscake@statuscake
 ```
 
-The skill needs the .NET tool on `PATH` (see [Install](#install)) and the token in the
-environment Claude Code runs commands in. The simplest place is the `env` block of
-`~/.claude/settings.json`:
+The skill runs `dotnet tool execute StatusCakeMcp@<version> --yes -- <command>`, pinned to
+the plugin's version, so it needs the .NET 10 SDK but no tool install, and updating the
+plugin updates the tool. It also needs the token in the environment Claude Code runs
+commands in. The simplest place is the `env` block of `~/.claude/settings.json`:
 
 ```json
 {
@@ -94,22 +108,32 @@ entry from your MCP config so you're not running both.
 
 ## Use as an MCP server
 
-The same binary runs as an MCP server under the **`mcp`** subcommand — point the client
-at the command with `args: ["mcp"]` and pass the token via its environment:
+The same package runs as an MCP server under the **`mcp`** subcommand. For Claude Code,
+launch it through the signed `dotnet` host with a pinned version (see [Install](#install)
+for why), passing the token via its environment:
+
+```bash
+claude mcp add statuscake -s user -e STATUSCAKE__APITOKEN=your-statuscake-api-token -- dotnet tool execute StatusCakeMcp@0.3.0 --yes -- mcp
+```
+
+Keep the `--` before `mcp`: it separates the tool's arguments from `dotnet tool execute`'s
+own. To upgrade, change the version in the config rather than running `dotnet tool update`.
+
+For other clients, the equivalent JSON config is:
 
 ```json
 {
   "mcpServers": {
     "statuscake": {
-      "command": "statuscake-mcp",
-      "args": ["mcp"],
+      "command": "dotnet",
+      "args": ["tool", "execute", "StatusCakeMcp@0.3.0", "--yes", "--", "mcp"],
       "env": { "STATUSCAKE__APITOKEN": "your-statuscake-api-token" }
     }
   }
 }
 ```
 
-`statuscake-mcp mcp` speaks **stdio** so the client launches it on demand. See
+The `mcp` subcommand speaks **stdio** so the client launches it on demand. See
 [Transports](#transports) below to run it as an HTTP server instead.
 
 ## Claude Desktop extension (.mcpb)
@@ -250,6 +274,8 @@ tests/StatusCakeMcp.Tests/
 plugin/
   .claude-plugin/plugin.json
   skills/statuscake/SKILL.md  # the Claude Code skill that drives the CLI
+scripts/
+  check-versions.sh    # CI guard: every pinned/declared version matches the .fsproj
 ```
 
 The project turns off the Web SDK's server defaults (Server GC, concurrent GC, dynamic
@@ -282,9 +308,13 @@ The same tag also triggers [`Release`](.github/workflows/release.yml), which bui
 Claude Desktop extension (`statuscake-mcp.mcpb`) at that version and attaches it to a
 GitHub Release of the same name. It needs no secrets beyond the automatic `GITHUB_TOKEN`.
 
-When you bump the version, also update `version` in
-[`plugin/.claude-plugin/plugin.json`](plugin/.claude-plugin/plugin.json) (and
-[`mcpb/manifest.json`](mcpb/manifest.json)) so Claude Code picks up the new skill.
+When you bump the version, update it everywhere it's named: `<Version>` in the `.fsproj`,
+`version` in [`plugin/.claude-plugin/plugin.json`](plugin/.claude-plugin/plugin.json) and
+[`mcpb/manifest.json`](mcpb/manifest.json), and every pinned `StatusCakeMcp@<version>` in
+the [skill](plugin/skills/statuscake/SKILL.md) and this README. The skill runs exactly that
+pinned version, so it must exist on NuGet. [`scripts/check-versions.sh`](scripts/check-versions.sh)
+checks they all agree; CI runs it on every push, and `Publish` runs it against the tag
+before packing, so a mismatched tag never reaches NuGet.
 
 `CI` ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) builds every push and
 PR to `main`.
