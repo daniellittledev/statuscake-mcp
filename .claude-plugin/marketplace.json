@@ -1,5 +1,6 @@
 {
   "name": "statuscake",
+  "description": "StatusCake uptime monitoring for Claude Code.",
   "owner": {
     "name": "daniellittledev"
   },
