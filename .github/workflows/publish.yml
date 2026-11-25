@@ -24,6 +24,10 @@ jobs:
       - name: Derive version from tag
         run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
 
+      # The skill and README pin StatusCakeMcp@<version>; refuse to publish a tag they don't name.
+      - name: Check versions match the tag
+        run: scripts/check-versions.sh "$VERSION"
+
       - name: Pack
         run: dotnet pack src/StatusCakeMcp -c Release -p:Version=$VERSION -o ./artifacts
 
