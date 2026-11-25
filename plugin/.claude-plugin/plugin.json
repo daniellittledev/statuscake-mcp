@@ -1,0 +1,10 @@
+{
+  "name": "statuscake",
+  "description": "StatusCake uptime monitoring for Claude Code via the statuscake-mcp CLI. No long-running MCP server.",
+  "version": "0.2.3",
+  "author": {
+    "name": "daniellittledev"
+  },
+  "repository": "https://github.com/daniellittledev/statuscake-mcp",
+  "license": "MIT"
+}

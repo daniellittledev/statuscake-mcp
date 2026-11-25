@@ -1,0 +1,13 @@
+{
+  "name": "statuscake",
+  "owner": {
+    "name": "daniellittledev"
+  },
+  "plugins": [
+    {
+      "name": "statuscake",
+      "source": "./plugin",
+      "description": "StatusCake uptime monitoring for Claude Code via the statuscake-mcp CLI. No long-running MCP server."
+    }
+  ]
+}

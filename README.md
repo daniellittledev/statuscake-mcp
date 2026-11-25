@@ -56,6 +56,39 @@ statuscake-mcp --help                     # full command list
 Exit codes: `0` success · `1` API/runtime error (auth, not found, timeout) · `2` usage
 error (unknown command or bad arguments). Errors print to stderr; output prints to stdout.
 
+## Use from Claude Code (skill, no MCP server)
+
+An MCP server stays resident for the whole Claude Code session. If you'd rather not
+keep a process around, install the **`statuscake` plugin** from this repo instead. It
+adds a skill that teaches Claude to run the CLI via Bash, so each lookup is a
+short-lived process that exits once it prints its answer.
+
+```text
+/plugin install statuscake --marketplace daniellittledev/statuscake-mcp
+```
+
+On older Claude Code versions, add the marketplace first:
+
+```text
+/plugin marketplace add daniellittledev/statuscake-mcp
+/plugin install statuscake@statuscake
+```
+
+The skill needs the .NET tool on `PATH` (see [Install](#install)) and the token in the
+environment Claude Code runs commands in. The simplest place is the `env` block of
+`~/.claude/settings.json`:
+
+```json
+{
+  "env": { "STATUSCAKE__APITOKEN": "your-statuscake-api-token" }
+}
+```
+
+Then just ask — "is anything down?", "uptime for the billing site", "any certs expiring
+this month?". The read-only commands are pre-approved by the skill; `pause`/`resume`
+still prompt, and Claude confirms the check with you first. Remove any `statuscake`
+entry from your MCP config so you're not running both.
+
 ## Use as an MCP server
 
 The same binary runs as an MCP server under the **`mcp`** subcommand — point the client
@@ -202,7 +235,16 @@ src/StatusCakeMcp/
 tests/StatusCakeMcp.Tests/
   FormatTests.fs       # xUnit tests for the pure functions in Format.fs
   CliTests.fs          # xUnit tests for the CLI argument parser
+.claude-plugin/
+  marketplace.json     # makes this repo a Claude Code plugin marketplace
+plugin/
+  .claude-plugin/plugin.json
+  skills/statuscake/SKILL.md  # the Claude Code skill that drives the CLI
 ```
+
+The project turns off the Web SDK's server defaults (Server GC, concurrent GC, dynamic
+PGO, ICU) because it only ever runs as a short CLI call or a single-user MCP process.
+That keeps both the per-call and the idle-server footprint small.
 
 ## Releasing
 
@@ -229,6 +271,10 @@ git push origin v0.1.0
 The same tag also triggers [`Release`](.github/workflows/release.yml), which builds the
 Claude Desktop extension (`statuscake-mcp.mcpb`) at that version and attaches it to a
 GitHub Release of the same name. It needs no secrets beyond the automatic `GITHUB_TOKEN`.
+
+When you bump the version, also update `version` in
+[`plugin/.claude-plugin/plugin.json`](plugin/.claude-plugin/plugin.json) (and
+[`mcpb/manifest.json`](mcpb/manifest.json)) so Claude Code picks up the new skill.
 
 `CI` ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) builds every push and
 PR to `main`.
