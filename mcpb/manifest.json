@@ -3,7 +3,7 @@
   "manifest_version": "0.3",
   "name": "statuscake-mcp",
   "display_name": "StatusCake",
-  "version": "0.2.3",
+  "version": "0.3.0",
   "description": "A minimal, token-efficient MCP server for StatusCake uptime monitoring.",
   "long_description": "Exposes a small set of tools for StatusCake uptime monitoring that return terse plain-text summaries (not raw JSON) so an LLM client spends as few tokens as possible: list_sites, check_sites_down, get_site, site_history, check_ssl_expiring, pause_site, and resume_site. List tools are filtered and paged so they stay cheap on accounts with thousands of checks. Runs locally over stdio as a self-contained binary; no .NET runtime install is required.",
   "author": {
@@ -22,7 +22,7 @@
     "entry_point": "server/StatusCakeMcp.exe",
     "mcp_config": {
       "command": "${__dirname}/server/StatusCakeMcp.exe",
-      "args": [],
+      "args": ["mcp"],
       "env": {
         "STATUSCAKE__APITOKEN": "${user_config.api_token}"
       }

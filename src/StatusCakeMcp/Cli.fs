@@ -186,8 +186,13 @@ module Cli =
             2
         | Ok cmd ->
             let config =
+                // Resolve appsettings.json next to the binary, not the caller's cwd, so running
+                // the CLI inside some other project never picks up that project's config.
                 ConfigurationBuilder()
+                    .SetBasePath(AppContext.BaseDirectory)
                     .AddJsonFile("appsettings.json", optional = true)
+                    // `dotnet user-secrets set StatusCake:ApiToken ...` works for the CLI too.
+                    .AddUserSecrets(typeof<Command>.Assembly, optional = true)
                     .AddEnvironmentVariables()
                     .Build()
 

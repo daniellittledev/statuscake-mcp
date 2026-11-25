@@ -61,7 +61,8 @@ module Commands =
             let note =
                 if pausedDown > 0 then
                     sprintf
-                        "\n(%d paused check%s last reported down — use list_sites status=paused to see them.)"
+                        // Shared by the CLI and MCP tools, so name the filter, not either front-end's syntax.
+                        "\n(%d paused check%s last reported down — list checks with status paused to see them.)"
                         pausedDown
                         (if pausedDown = 1 then "" else "s")
                 else

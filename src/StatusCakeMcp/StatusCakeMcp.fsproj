@@ -9,12 +9,30 @@
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>statuscake-mcp</ToolCommandName>
     <PackageId>StatusCakeMcp</PackageId>
-    <Version>0.2.3</Version>
+    <Version>0.3.0</Version>
     <Authors>daniellittledev</Authors>
     <Description>A minimal, token-efficient StatusCake uptime monitoring tool — a command-line client by default, and a Model Context Protocol (MCP) server (stdio or Streamable HTTP) under the `mcp` subcommand.</Description>
     <PackageTags>mcp;statuscake;uptime;monitoring;model-context-protocol</PackageTags>
     <!-- Run on any newer installed runtime, not just the exact 8.0 build. -->
     <RollForward>Major</RollForward>
+    <!-- Lets `dotnet user-secrets set StatusCake:ApiToken ...` feed the CLI (and the MCP host in Development). -->
+    <UserSecretsId>statuscake-mcp</UserSecretsId>
+  </PropertyGroup>
+
+  <!-- Keep the footprint small. This is a short-lived CLI or a single-user MCP process,
+       not a web farm, so the Web SDK's server defaults just waste memory. -->
+  <PropertyGroup>
+    <!-- The Web SDK enables Server GC, which reserves a heap and a GC thread per core.
+         Workstation, non-concurrent GC is far lighter for a single-user process. -->
+    <ServerGarbageCollection>false</ServerGarbageCollection>
+    <ConcurrentGarbageCollection>false</ConcurrentGarbageCollection>
+    <!-- Dynamic PGO instruments hot methods to re-JIT them later; that only pays off in
+         long-running hot loops, which a CLI call or an idle MCP server never has. -->
+    <TieredPGO>false</TieredPGO>
+    <!-- No culture-specific formatting is needed; skips loading ICU at startup. -->
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <!-- Don't ship FSharp.Core's ~13 satellite resource languages. -->
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
   </PropertyGroup>
 
   <ItemGroup>
